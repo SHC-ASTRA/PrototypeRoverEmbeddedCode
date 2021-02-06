@@ -21,6 +21,11 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 
 #define BAT_SENS_PIN PIN_A2
 
+#define SerialJ Serial1
+
+#define NX_SLEEP_PIN 3
+#define NX_RESET_PIN 2
+
 ADC *adc = new ADC();
 ;                                  // adc object
 float cells = 4;                   // Number of battery cells present
@@ -76,6 +81,8 @@ void setup()
 {
 
   Serial.begin(115200);
+  SerialJ.begin(115200,SERIAL_8N1);
+  Serial5.begin(115200,SERIAL_8N1);
   for (int i = 0; i < 30000 && !Serial; i++)
   {
     delay(1);
@@ -139,6 +146,13 @@ void setup()
   float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
 
   Serial.printf("Bat Charge: %.2f   Bat Voltage: %.2f\n\r",batCharge,batVoltage);
+
+  // pinMode(NX_SLEEP_PIN, OUTPUT);
+
+  // digitalWrite(NX_SLEEP_PIN, HIGH);
+  // delay(500);
+  // digitalWrite(NX_SLEEP_PIN, LOW);
+
 }
 
 void loop()
@@ -239,6 +253,19 @@ void loop()
     lastGPSTime = millis();
     myGNSS.checkUblox();     // Check for the arrival of new data and process it.
     myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
+
+    SerialJ.println("Test!");
+    //Serial.println("Test!");
+
+
+  }
+  while(Serial5.available() > 0)
+  {
+    Serial.print((char)Serial5.read());
+  }
+  while(Serial.available() > 0)
+  {
+    Serial5.print((char)Serial.read());
   }
 }
 
