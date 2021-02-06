@@ -76,7 +76,7 @@ void setup()
 {
 
   Serial.begin(115200);
-  for (int i = 0; i < 5000 && !Serial; i++)
+  for (int i = 0; i < 30000 && !Serial; i++)
   {
     delay(1);
   }
@@ -112,11 +112,11 @@ void setup()
 
     myGNSS.setNavigationFrequency(2); //Produce two solutions per second
 
-    myGNSS.setAutoPVTcallback(&printPVTdata); // Enable automatic NAV PVT messages with callback to printPVTdata
+    //myGNSS.setAutoPVTcallback(&printPVTdata); // Enable automatic NAV PVT messages with callback to printPVTdata
   }
 
   strip.begin();
-  strip.setBrightness(32);
+  strip.setBrightness(16);
   strip.show(); // Initialize all pixels to 'off'
 
   Serial.println("LED Set");
@@ -132,7 +132,13 @@ void setup()
   adc->adc0->setAveraging(16);                                         // set number of averages
   adc->adc0->setResolution(16);                                        // set bits of resolution
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
-  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);          // change the sampling speed
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);          // change the sampling speed\
+
+  int value1 = adc->adc0->analogRead(BAT_SENS_PIN);
+  float batVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue();
+  float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
+
+  Serial.printf("Bat Charge: %.2f   Bat Voltage: %.2f\n\r",batCharge,batVoltage);
 }
 
 void loop()
