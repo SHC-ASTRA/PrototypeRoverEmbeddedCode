@@ -79,17 +79,43 @@ uint32_t lastPacketTime = 0;
 
 void setup()
 {
+  //Start by initializing RGB LED Ring
+  strip.begin();
+  strip.setBrightness(32);
 
+  //Draw a red smiley face
+  uint32_t red = strip.gamma32(strip.ColorHSV(0, 255, 255));
+  strip.setPixelColor(0, red);
+  strip.setPixelColor(5, red);
+  for (int i = 5+6; i < LED_COUNT-5; i++)
+  {
+    strip.setPixelColor(i, red);
+  }
+  strip.show();
+
+  //Initialize the serial ports
   Serial.begin(115200);
   SerialJ.begin(115200,SERIAL_8N1);
-  Serial5.begin(115200,SERIAL_8N1);
-  for (int i = 0; i < 30000 && !Serial; i++)
+
+  //Wait 30 seconds for the USB serial port to connect to a computer
+  //If 30 seconds passes with no connection, proceed anyways
+  for (int i = 0; i < 3000 && !Serial; i++)
   {
-    delay(1);
+    delay(10);
+
+    //While waiting for the serial port to open, make a rainbow smiley face that changes color progressively faster and faster
+    uint32_t rgbcolor = strip.gamma32(strip.ColorHSV((i*300*i/5000)%65536, 255, 255));
+    strip.setPixelColor(0, rgbcolor);
+    strip.setPixelColor(5, rgbcolor);
+    for (int j = 5+6; j < LED_COUNT-5; j++)
+    {
+      strip.setPixelColor(j, rgbcolor);
+    }
+    strip.show();
   }
 
-  Serial.println("LoRa Duplex");
-
+  // Initialize LoRa radio
+  Serial.println("Initializing LoRa");
   LoRa.setPins(RFM95_CS, RFM95_RST, RFM95_INT);
 
   if (!LoRa.begin(RF95_FREQ))
@@ -97,20 +123,21 @@ void setup()
     Serial.println("LoRa init failed. Check your connections.");
     while (true)
       ; // if failed, do nothing
+        // TODO: change this to more gracefully deal with failure
   }
   LoRa.setTxPower(20);
   LoRa.setSignalBandwidth(125E3);
-  LoRa.enableCrc();
-
   Serial.println("LoRa init succeeded.");
 
+  // Initialize I2C for the GPS module
   Wire.begin();
   Wire.setClock(400000);
 
-  if (myGNSS.begin() == false)
+  // Initialize the GPS module
+  if (!myGNSS.begin())
   {
     Serial.println(F("Ublox GPS not detected at default I2C address. Please check wiring."));
-    GNSS_enable = false;
+    GNSS_enable = false;  // Set a flag to false if the GPS is not functional
   }
   else
   {
@@ -122,28 +149,26 @@ void setup()
     //myGNSS.setAutoPVTcallback(&printPVTdata); // Enable automatic NAV PVT messages with callback to printPVTdata
   }
 
-  strip.begin();
-  strip.setBrightness(16);
-  strip.show(); // Initialize all pixels to 'off'
-
-  Serial.println("LED Set");
-
+  // Set motor pins to output
   for (int i = 0; i < numMotors; i++)
   {
     pinMode(motorPWMPins[i], OUTPUT);
     pinMode(motorDIRPins[i], OUTPUT);
   }
 
+  // Set battery voltage sense pin to input
   pinMode(BAT_SENS_PIN, INPUT);
 
+  // Configure ADC0
   adc->adc0->setAveraging(16);                                         // set number of averages
   adc->adc0->setResolution(16);                                        // set bits of resolution
   adc->adc0->setConversionSpeed(ADC_CONVERSION_SPEED::VERY_LOW_SPEED); // change the conversion speed
-  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);          // change the sampling speed\
+  adc->adc0->setSamplingSpeed(ADC_SAMPLING_SPEED::MED_SPEED);          // change the sampling speed
 
-  int value1 = adc->adc0->analogRead(BAT_SENS_PIN);
-  float batVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue();
-  float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
+  //Read battery voltage
+  int value1 = adc->adc0->analogRead(BAT_SENS_PIN); // get raw ADC reading
+  float batVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue(); // convert reading to voltage
+  float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage); // convert voltage to naive charge percent (could be improved by factoring in discharge curves)
 
   Serial.printf("Bat Charge: %.2f   Bat Voltage: %.2f\n\r",batCharge,batVoltage);
 
@@ -157,13 +182,12 @@ void setup()
 
 void loop()
 {
-
+  //Read battery voltage
   int value1 = adc->adc0->analogRead(BAT_SENS_PIN);
   float batVoltage = value1 * 3.3 / (1.0 / (1.0 + 10.0)) / adc->adc0->getMaxValue();
   float batCharge = (batVoltage - minBatVoltage) / (maxBatVoltage - minBatVoltage);
 
-  //float testVar = (millis()%10000)/10000.0;
-
+  //Light up LED ring to correspond to battery charge level
   for (int i = 0; i < LED_COUNT; i++)
   {
     // uint32_t rgbcolor = strip.gamma32(strip.ColorHSV((i * 65536) / (LED_COUNT + 1) + millis() * 100, 255, 255));
@@ -173,32 +197,16 @@ void loop()
     uint32_t rgbcolor = strip.gamma32(strip.ColorHSV((int)map(batCharge,1.0,0.0,1,65536/3), 255, valueVar));
     strip.setPixelColor(i, rgbcolor);
   }
-
   strip.show();
 
   delay(1);
 
+  // Check for LoRa messages
   String message = "";
   if (!((message = onReceive(LoRa.parsePacket())).equals("")))
   {
-    // char buffer[64];
 
-    // if (GNSS_enable)
-    // {
-    //   if (longitude_mdeg != 0 && latitude_mdeg != 0)
-    //   {
-    //     sprintf(buffer, "Latitude (deg): %.6f\nLongitude (deg): %.6f\n", latitude_mdeg / 1000000., longitude_mdeg / 1000000.);
-    //   }
-    //   else
-    //   {
-    //     sprintf(buffer, "No Fix - Num. satellites: %d\n", numSats);
-    //   }
-    // }
-    // else
-    // {
-    //   sprintf(buffer, "Acknowledged ");
-    // }
-
+    // Parse message to control commands
     message.trim();
 
     int horz = message.substring(1, message.indexOf(',')).toInt();
@@ -208,6 +216,7 @@ void loop()
     Serial.print(", ");
     Serial.println(vert);
 
+    // Generate motor speeds from control commands
     frleftMotorSpd = constrain(-vert - horz, -255, 255);
     frrightMotorSpd = constrain(-vert + horz, -255, 255);
     bkleftMotorSpd = constrain(-vert - horz, -255, 255);
@@ -228,6 +237,9 @@ void loop()
     //Serial.print(buffer);
   }
 
+
+  // If no LoRa message has been recieved for 0.25 seconds or battery voltage is too low,
+  // set motor speeds to zero
   if (millis() - lastPacketTime > 250 || batVoltage < minBatVoltage)
   {
     frleftMotorSpd = 0;
@@ -236,6 +248,7 @@ void loop()
     bkrightMotorSpd = 0;
   }
 
+  // Set motor speeds
   analogWrite(motorPWMPins[frleftMotorIdx], abs(frleftMotorSpd));
   digitalWrite(motorDIRPins[frleftMotorIdx], frleftMotorRev ? frleftMotorSpd > 0 : frleftMotorSpd < 0);
 
@@ -248,24 +261,12 @@ void loop()
   analogWrite(motorPWMPins[bkrightMotorIdx], abs(bkrightMotorSpd));
   digitalWrite(motorDIRPins[bkrightMotorIdx], bkrightMotorRev ? bkrightMotorSpd > 0 : bkrightMotorSpd < 0);
 
+  // Process GPS
   if (millis() - 250 > lastGPSTime && GNSS_enable)
   {
     lastGPSTime = millis();
     myGNSS.checkUblox();     // Check for the arrival of new data and process it.
     myGNSS.checkCallbacks(); // Check if any callbacks are waiting to be processed.
-
-    SerialJ.println("Test!");
-    //Serial.println("Test!");
-
-
-  }
-  while(Serial5.available() > 0)
-  {
-    Serial.print((char)Serial5.read());
-  }
-  while(Serial.available() > 0)
-  {
-    Serial5.print((char)Serial.read());
   }
 }
 
