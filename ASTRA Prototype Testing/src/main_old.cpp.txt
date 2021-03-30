@@ -77,7 +77,7 @@ int motorDir = 1;
 
 uint32_t lastPacketTime = 0;
 
-void setup_old()
+void setup()
 {
   //Start by initializing RGB LED Ring
   strip.begin();
@@ -180,7 +180,7 @@ void setup_old()
 
 }
 
-void loop_old()
+void loop()
 {
   //Read battery voltage
   int value1 = adc->adc0->analogRead(BAT_SENS_PIN);
