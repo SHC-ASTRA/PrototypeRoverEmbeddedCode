@@ -26,7 +26,7 @@ Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_RGBW + NEO_KHZ800);
 void clear_strip(uint32_t color);
 void set_single_color(int pin, uint32_t color);
 // RGB Strip Color Constants
-const uint32_t serial_tx_color = strip.Color(0, 255, 0, 0);
+const uint32_t serial_tx_color = strip.Color(255, 0, 0, 0);
 const uint32_t serial_rx_color = strip.Color(255, 128, 0);
 const uint32_t clear_color = strip.Color(0, 0, 0);
 const uint32_t border_color = strip.Color(255, 0, 127);
