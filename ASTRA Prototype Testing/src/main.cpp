@@ -68,8 +68,7 @@ int frrightMotorSpd = 0;
 int bkleftMotorSpd = 0;
 int bkrightMotorSpd = 0;
 
-int motorSpeed = 0;
-int motorDir = 1;
+void calculateMotorSpeeds(float magnitude, float direction, float speed);
 
 //*******************************
 // Battery Voltage Reader Config
@@ -190,6 +189,20 @@ void loop()
         String command = Serial.readStringUntil('\n');
         parseCommand(command);
     }
+
+    // Set motor speeds
+    analogWrite(motorPWMPins[frleftMotorIdx], abs(frleftMotorSpd));
+    digitalWrite(motorDIRPins[frleftMotorIdx], frleftMotorRev ? frleftMotorSpd > 0 : frleftMotorSpd < 0);
+
+    analogWrite(motorPWMPins[frrightMotorIdx], abs(frrightMotorSpd));
+    digitalWrite(motorDIRPins[frrightMotorIdx], frrightMotorRev ? frrightMotorSpd > 0 : frrightMotorSpd < 0);
+
+    analogWrite(motorPWMPins[bkleftMotorIdx], abs(bkleftMotorSpd));
+    digitalWrite(motorDIRPins[bkleftMotorIdx], bkleftMotorRev ? bkleftMotorSpd > 0 : bkleftMotorSpd < 0);
+
+    analogWrite(motorPWMPins[bkrightMotorIdx], abs(bkrightMotorSpd));
+    digitalWrite(motorDIRPins[bkrightMotorIdx], bkrightMotorRev ? bkrightMotorSpd > 0 : bkrightMotorSpd < 0);
+
     // Two Jobs
     //  - Relay Sensor Data
     //      - Read + Store Sensor Values
@@ -206,11 +219,32 @@ void parseCommand(String command)
     String exec = command.substring(0, command.indexOf(';'));
     if (exec.equals("set_motors"))
     {
-        String mag = command.substring(exec.length()+1, command.indexOf(','));
-        String dir = command.substring(command.indexOf(',')+1);
+        int firstCommma = command.indexOf(',');
+        int lastComma = command.lastIndexOf(',');
+        String mag = command.substring(exec.length()+1, firstCommma);
+        String dir = command.substring(firstCommma+1, lastComma);
+        String speed_str = command.substring(lastComma+1);
+        
+        float magnitude = strtof(mag.c_str(), NULL);
+        float direction = strtof(dir.c_str(), NULL);
+        float speed = strtof(speed_str.c_str(), NULL);
 
-        Serial.println("response;" + exec + " " + mag + " " + dir);
+        calculateMotorSpeeds(magnitude, direction, speed);
     }
+}
+
+void calculateMotorSpeeds(float magnitude, float direction, float speed)
+{
+    float scale = 255 * speed;
+    frleftMotorSpd = (int)constrain(scale*(-magnitude - direction), -255, 255);
+    frrightMotorSpd = (int)constrain(scale*(-magnitude + direction), -255, 255);
+    bkleftMotorSpd = (int)constrain(scale*(-magnitude - direction), -255, 255);
+    bkrightMotorSpd = (int)constrain(scale*(-magnitude + direction), -255, 255);
+
+    Serial.print("status;");
+    Serial.print(frleftMotorSpd);
+    Serial.print(" ");
+    Serial.println(frrightMotorSpd);
 }
 
 void clear_strip(uint32_t color)
